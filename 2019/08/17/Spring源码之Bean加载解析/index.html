@@ -7,7 +7,9 @@
 <li>WEB<br>Web上下文模块建立在应用程序上下文模块之上，为基于Web的应用程序提供了上下文。</li>
 <li>AOP<br>它让你可以定义例如方法拦截器和切点，从而将逻辑代码分开，降低它们之间的耦合性。Spring AOP模块为基于Spring的应用程序中的对象提供了事务管理服务，通过使用Spring AOP,不用依赖EJB组件，就可以将声明性事务管理集成到应用程序中。</li>
 </ol>
-<h1 id="Bean容器"><a href="#Bean容器" class="headerlink" title="Bean容器"></a>Bean容器</h1><p>bean是Spring中最核心的东西，因为Spring就像是个大水桶，而bean就像是容器中的水，水桶脱离了水也就没什么作用了。在这里我讲解一下利用读取XML文件进行Bean容器的基本实现。<br><img src="https://raw.githubusercontent.com/spurstong/img_data/master/Spring%E6%BA%90%E7%A0%81%E4%B9%8BBean%E5%8A%A0%E8%BD%BD/2.png" alt="2.png"><br>核心类一： <em>DefaultListableBeanFactory</em><br>XmlBeanFactory继承自DefaultListableBeanFactory,而DefaultListableBeanFactory是整个bean加载的核心部分，是Spring注册及加载bean的默认实现，对于XmlBeanFactory,使用了自定义的XML读取器XmlBeanDefinitionReader,实现了个性化的BeanDefinitionReader读取。<br>现在先简单介绍上图中各个类的作用，具体的使用信息在后面的文章会讲到。</p>
+<h1 id="Bean容器"><a href="#Bean容器" class="headerlink" title="Bean容器"></a>Bean容器</h1><p>bean是Spring中最核心的东西，因为Spring就像是个大水桶，而bean就像是容器中的水，水桶脱离了水也就没什么作用了。在这里我讲解一下利用读取XML文件进行Bean容器的基本实现。<br><img src="https://raw.githubusercontent.com/spurstong/img_data/master/Spring%E6%BA%90%E7%A0%81%E4%B9%8BBean%E5%8A%A0%E8%BD%BD/2.png" alt="2.png"></p>
+<p>核心类一： <em>DefaultListableBeanFactory</em></p>
+<p>XmlBeanFactory继承自DefaultListableBeanFactory,而DefaultListableBeanFactory是整个bean加载的核心部分，是Spring注册及加载bean的默认实现，对于XmlBeanFactory,使用了自定义的XML读取器XmlBeanDefinitionReader,实现了个性化的BeanDefinitionReader读取。<br>现在先简单介绍上图中各个类的作用，具体的使用信息在后面的文章会讲到。</p>
 <ul>
 <li>singletonBeanRegistry: 定义对单例的注册及获取。</li>
 <li>BeanFactory: 定义获取bean及bean的各种属性。</li>
@@ -16,7 +18,11 @@
 <li>BeanDefinitionRegistry: 定义对BeanDefinition的各种增删改操作。</li>
 <li>ConfigurableBeanFactory: 提供配置Factory的各种方法。</li>
 <li>ListableBeanFactory: 根据各种 条件获取bean的配置清单。</li>
-<li>AutowireCapableBeanFactory: 提供创建bean、自动注入、初始化以及应用bean的后处理器。<br>DefaultListableBeanFactory综合了上面的所有功能，主要是对bean注册后的处理。<br>XmlBeanFactory对DefaultListableBeanFactory类进行了扩展，主要用于从XML文档中读取BeanDefinition,以及注册及获取bean。<br>核心类二：  XmlBeanDefinitionReader<br>对资源文件进行读取、解析及注册<br>简单介绍该类继承的抽象类和接口</li>
+<li>AutowireCapableBeanFactory: 提供创建bean、自动注入、初始化以及应用bean的后处理器。<br>DefaultListableBeanFactory综合了上面的所有功能，主要是对bean注册后的处理。</li>
+</ul>
+<p>XmlBeanFactory对DefaultListableBeanFactory类进行了扩展，主要用于从XML文档中读取BeanDefinition,以及注册及获取bean。</p>
+<p>核心类二：  XmlBeanDefinitionReader<br>对资源文件进行读取、解析及注册<br>简单介绍该类继承的抽象类和接口</p>
+<ul>
 <li>ResourceLoader: 定义资源加载器，主要应用于根据给定的资源文件地址返回对应的Resource.</li>
 <li>BeanDefinitionReader: 主要定义资源文件读取并转换为BeanDefinition的各个功能。</li>
 <li>BeanDefinitionDocumentReader: 定义读取Document并注册BeanDefinition.<h1 id="容器的基础XmlBeanFactory"><a href="#容器的基础XmlBeanFactory" class="headerlink" title="容器的基础XmlBeanFactory"></a>容器的基础XmlBeanFactory</h1>当前获取创建beanFactory的代码如下<blockquote>
