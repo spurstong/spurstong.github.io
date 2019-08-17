@@ -1,0 +1,62 @@
+<!DOCTYPE html><html lang="zh-cn"><head><meta name="generator" content="Hexo 3.9.0"><meta charset="utf-8"><meta name="X-UA-Compatible" content="IE=edge"><title> jvm垃圾收集器 · 房东的小黑</title><meta name="description" content="jvm垃圾收集器 - Mara Tong"><meta name="viewport" content="width=device-width, initial-scale=1"><link rel="icon" href="/favicon.png"><link rel="stylesheet" href="/css/apollo.css"><link rel="search" type="application/opensearchdescription+xml" href="https://github.com/spurstong/atom.xml" title="房东的小黑"></head><body><div class="wrap"><header><a href="/" class="logo-link"><img src="/black.jpg" alt="logo"></a><ul class="nav nav-list"><li class="nav-list-item"><a href="/" target="_self" class="nav-list-link">BLOG</a></li><li class="nav-list-item"><a href="https://www.jianshu.com/u/a8d49bf62c45" target="_blank" class="nav-list-link">JIANSHU</a></li><li class="nav-list-item"><a href="https://github.com/spurstong" target="_blank" class="nav-list-link">GITHUB</a></li><li class="nav-list-item"><a href="/about" target="_self" class="nav-list-link">ABOUT</a></li><li class="nav-list-item"><a href="https://www.jianshu.com/u/a8d49bf62c45" target="_blank" class="nav-list-link">房东的小黑黑</a></li></ul><div class="mySign">加油</div></header><main class="container"><div class="post"><article class="post-block"><h1 class="post-title">jvm垃圾收集器</h1><div class="post-info">2019年7月17日</div><div class="post-content"><p>收集算法是内存回收的方法论，而垃圾收集器就是内存回收的具体实现。主要垃圾收集器分为下面几种，而G1收集器将在另一篇文章中介绍。</p>
+<a id="more"></a>
+<p>收集算法是内存回收的方法论，而垃圾收集器就是内存回收的具体实现。主要垃圾收集器分为下面几种，而G1收集器将在另一篇文章中介绍。</p>
+<h1 id="serial收集器"><a href="#serial收集器" class="headerlink" title="serial收集器"></a>serial收集器</h1><p>是一个单线程的收集器，在它进行垃圾回收时，必须暂停其他所有的工作线程，直到它收集结束。<br><img src="https://raw.githubusercontent.com/spurstong/img_data/master/jvm%E5%9E%83%E5%9C%BE%E6%94%B6%E9%9B%86%E5%99%A8/1.png" alt="1.png"><br>但它依然是虚拟机运行在Client模式下的默认新生代收集器。它 有着优于其他收集器的地方：简单而高效（与其他收集器的单线程相比）。在单个CPU的环境下，serial收集器由于没有线程交互的开销</p>
+<h1 id="ParNew收集器"><a href="#ParNew收集器" class="headerlink" title="ParNew收集器"></a>ParNew收集器</h1><p>ParNew收集器其实是Serial收集器的多线程版本<br>它是运行在Server模式下的虚拟机中首选的新生代收集器，除了Serial收集器外，目前只有它能与CMS收集器配合工作。<br>ParNew收集器在单CPU的环境下绝对不会有比Serial收集器更好的效果，但是随着使用的CPU数量的增加，它对于GC时环境资源的有效利用还是很有好处的。<br>tips：<br>并行：指多条垃圾收集线程并行工作，但此时用户线程仍然处于等待线程<br>并发：用户线程与垃圾收集线程同时执行（但不一定是并行的，可能会交替执行），用户程序在继续执行，而垃圾收集程序运行于另一个CPU上</p>
+<p><img src="https://raw.githubusercontent.com/spurstong/img_data/master/jvm%E5%9E%83%E5%9C%BE%E6%94%B6%E9%9B%86%E5%99%A8/3.png" alt="3.png"></p>
+<h1 id="Parallel-Scavenge收集器"><a href="#Parallel-Scavenge收集器" class="headerlink" title="Parallel Scavenge收集器"></a>Parallel Scavenge收集器</h1><ol>
+<li>它是一个新生代收集器，它也是使用复制算法的收集器</li>
+<li>它的关注点与其他收集器不同，CMS等收集器的关注点是尽可能地缩短垃圾收集时<strong>用户线程的停顿时间</strong>，而Parallel Scavenge收集器的目标是达到一个可控制的<strong>吞吐量</strong></li>
+<li>-XX:MaxGCPauseMillis 控制最大垃圾收集停顿时间， -XX：GCTimeRatio 设置吞吐量的大小<br>GC停顿时间缩短是以牺牲吞吐量和新生代空间来换取的<br>GCTimeRatio的参数的值应当是一个大于0且小于100的整数，也就是垃圾收集时间占总时间的比率，相当于吞吐量的倒数。默认值为99，就是允许最大1%（即1/(1+99)）的垃圾收集时间</li>
+<li>它也被称为“吞吐量优先”收集器。它还有一个参数-XX: +UseAdaptiveSizePolicy,这是一个开关参数，虚拟机会根据当前系统的运行情况收集性能控制信息，动态调整这些参数以提供最合适的停顿时间或者最大的吞吐量，这种调节方式成为GC自适应的调节策略，自适用调节策略也是Parallel Scavenge收集器与parNew收集器的一个重要区别。<h1 id="CMS收集器"><a href="#CMS收集器" class="headerlink" title="CMS收集器"></a>CMS收集器</h1>注释：下面的内容是引用的阿里云云栖社区的一篇文章，感谢分享<br>大多数文章中写到它是针对老年代的收集器，但实际上它也管理新生代，它管理新生代的方式与Parallel收集器和Serial收集器相同，而在老年代则是尽可能地并发执行，每个垃圾收集器周期只有两次短停顿。</li>
+</ol>
+<ul>
+<li>它设计的初衷是为了消除Throught收集器和Serial收集器在<strong>Full GC周期中的长时间停顿</strong>。</li>
+<li>使用场景： 更快的响应，不希望有长时间的停顿，同时你的CPU资源也比较丰富<br>它有四个步骤： <strong>初始标记</strong>、<strong>并发标记</strong>、<strong>再次标记</strong>和<strong>并发清除</strong></li>
+</ul>
+<ol>
+<li>初始标记： 标记从GC Root直接可达的老年代对象、新声代引用的老年代对象，就是下图中灰色的点，这个过程是单线程的（JDK7之前是单线程，JDK8之后是并行，可以通过<em>CMSParallelInitialMarkEnabled</em>调整）<br>通过-XX:+CMSParallelInitialMarkEnabled参数可以开启该阶段的并行标记，使用多个线程进行标记，减少暂停时间。</li>
+</ol>
+<p><img src="https://raw.githubusercontent.com/spurstong/img_data/master/jvm%E5%9E%83%E5%9C%BE%E6%94%B6%E9%9B%86%E5%99%A8/2.png" alt="2.png"></p>
+<ol start="2">
+<li>并发标记：由上一个阶段标记过的对象，开始tracing过程，标记所有可达的对象，这个阶段垃圾回收线程和应用线程同时运行，在并发标记过程中，应用线程还在跑，因此会导致有些对象从新生代晋升到老年代，有些老年代的对象引用会被改变、有些对象会直接分配到老年代，这些受影响的老年代对象所在的card会被标记为dirty，用于重新标记阶段扫描。在这个阶段中，老年代对象的card被标记为dirty的可能原因，就是下图中绿色的线：<br><img src="https://raw.githubusercontent.com/spurstong/img_data/master/jvm%E5%9E%83%E5%9C%BE%E6%94%B6%E9%9B%86%E5%99%A8/4.png" alt="4.png"></li>
+<li>预清理： 也是用于标记老年代存活的对象，目的是为了让重新标记阶段的STW尽可能短。这个阶段的目标是在并发标记阶段被应用线程影响到的老年代对象，包括：老年代中card为dirty的对象 ，幸存区（from和to）中引用的老年代对象，因此，这个阶段也需要扫描新生代+老年代</li>
+<li>可中断的预清理：这个阶段的目标跟“预清理”阶段相同，也是为了减轻重新标记阶段的工作。<br>在预清理步骤后，如果满足下面两个条件，就不会开启可中断的预清理，直接进入重复标记阶段。</li>
+</ol>
+<ul>
+<li>Eden的使用空间大于“CMSScheduleRemarkEdenSizeThreshold”,这个参数的默认值是2M</li>
+<li>Eden的使用率大于等于“CMSScheduleRemarkEdenPenetration”,这个参数的默认值是50%<br>如果不满足上面两个条件，则进入可中断的预处理，可中断预处理可能会执行多次。</li>
+</ul>
+<ol start="5">
+<li>重新标记：重新扫描堆中的对象，进行可达性分析，标记活着的对象。这个阶段扫描的目标是：新生代的对象 + GC Roots + 前面被标记为dirty的card对应的老年代对象。这个过程是多线程的</li>
+<li>并发清除：用户线程被重新激活，同时将那些未被标记为存活的对象标记为不可达</li>
+<li>并发重置： CMS内部重置回收器状态，准备进入下一个并发回收周期</li>
+</ol>
+<h1 id="可能出现的问题"><a href="#可能出现的问题" class="headerlink" title="可能出现的问题"></a>可能出现的问题</h1><ul>
+<li>并发模式失败（Concurrent mode failure）：CMS的目标就是在回收老年代对象的时候不要停止全部应用线程，在并发周期执行期间，用户的线程依然在运行，如果这时候如果应用线程向老年代请求分配的空间超过预留的空间（担保失败），就回触发concurrent mode failure，然后CMS的并发周期就会被一次Full GC代替——停止全部应用进行垃圾收集，并进行空间压缩。如果我们设置了<strong>UseCMSInitiatingOccupancyOnly</strong>和<strong>CMSInitiatingOccupancyFraction</strong>参数，其中<strong>CMSInitiatingOccupancyFraction</strong>的值是70，那预留空间就是老年代的30%。</li>
+<li>CMS是基于‘’标记–清除‘’算法实现的收集器，在收集结束后可能会产生大量空间碎片。空间碎片过多，将会给大对象分配带来很大麻烦，当无法找到足够大的连续空间来分配当前对象，不得不提前触发一次full gc。为了解决这个问题，CMS收集器提供了一个参数-xx + UseCMSCompactAtFullCollection(默认是开启的)，在进行Full GC时开启<strong>内存碎片的合并整理过程</strong>，内存整理的过程是<strong>无法并发</strong>的，空间碎片问题没有了，但停顿时间不得不变长。<br>还提供了另外一个参数 <em>-XX: CMSFullGcsBeforeCompaction</em>,这个参数用于设置执行了多少次不压缩的Full GC后，跟着来一次带压缩的（默认值为0，表示每次进入Full GC时都进入Full GC时都进行碎片整理）<br>由于并发收集器不对内存空间进行压缩,整理,所以运行一段时间以后会产生”碎片”,使得运行效率降低.此值设置运行多少次GC以后对内存空间进行压缩,整理。<ul>
+<li>永久代空间（或Java8的元空间）耗尽，默认情况下,CMS不会对永久代进行收集，一旦永久代空间耗尽，就回触发Full GC。 <h1 id="CMS的调优"><a href="#CMS的调优" class="headerlink" title="CMS的调优"></a>CMS的调优</h1></li>
+</ul>
+</li>
+</ul>
+<ol>
+<li>针对并发模式失败的调优</li>
+</ol>
+<ul>
+<li>尽可能地增大老年代的空间，增加整个堆的大小，或者减少年轻代的大小</li>
+<li>以更高的频率执行后台的回收线程，即提高CMS并发周期发生的概率。设置<em>seCMSInitiatingOccupancyOnly</em>和<em>CMSInitiatingOccupancyFraction</em>参数，</li>
+</ul>
+<p><em>seCMSInitiatingOccupancyOnly</em> –&gt; 使用手动定义初始化定义开始CMS收集，系统是禁止hostspot自行出发CMS GC的<br><em>XX:CMSInitiatingOccupancyFraction=70</em> –&gt; 使用cms作为垃圾回收使用70%后开始CMS收集，但是这个值也不能调的太低，太低了会导致过多的无效的并发周期，会导致消耗CpU时间和更多的无效的停顿。</p>
+<ul>
+<li>增多回收线程的个数<br>CMS默认的垃圾收集线程数是 <em>（CPU个数 + 3）/4</em>，这个公式的含义是：当CPU个数大于4个的时候，垃圾回收后台线程至少占用25%的CPU资源。举个例子：如果CPU核数是1-4个，那么会有1个CPU用于垃圾收集，如果CPU核数是5-8个，那么久会有2个CPU用于垃圾收集。</li>
+<li>针对永久代的调优<br>如果永久代需要垃圾回收（或元空间扩容），就会触发Full GC。默认情况下，CMS不会处理永久代中的垃圾，可以通过开启<em>CMSPermGenSweepingEnabled</em>配置来开启永久代中的垃圾回收，开启后会有一组后台线程针对永久代做收集，需要注意的是，触发永久代进行垃圾收集的指标跟触发老年代进行垃圾收集的指标是独立的，老年代的阈值可以通过<em>CMSInitiatingPermOccupancyFraction</em>参数设置，这个参数的默认值是80%。开启对永久代的垃圾收集只是其中的一步，还需要开启另一个参数——<em>CMSClassUnloadingEnabled</em>，使得在垃圾收集的时候可以卸载不用的类</li>
+</ul>
+</div></article></div></main><footer><div class="paginator"><a href="/2019/07/18/G1垃圾收集器详解/" class="prev">上一篇</a><a href="/2019/07/15/java虚拟机内存模型/" class="next">下一篇</a></div><div id="disqus_thread"></div><script>var disqus_shortname = 'seansun';
+var disqus_identifier = '2019/07/17/jvm垃圾收集器/';
+var disqus_title = 'jvm垃圾收集器';
+var disqus_url = 'https://github.com/spurstong/2019/07/17/jvm垃圾收集器/';
+(function() {
+    var dsq = document.createElement('script'); dsq.type = 'text/javascript'; dsq.async = true;
+    dsq.src = '//' + disqus_shortname + '.disqus.com/embed.js';
+    (document.getElementsByTagName('head')[0] || document.getElementsByTagName('body')[0]).appendChild(dsq);
+})();</script><script id="dsq-count-scr" src="//seansun.disqus.com/count.js" async></script><div class="copyright"><p>© 2018 - 2019 <a href="https://github.com/spurstong">Mara Tong</a>, powered by <a href="https://hexo.io/" target="_blank">Hexo</a> and <a href="https://github.com/pinggod/hexo-theme-apollo" target="_blank">hexo-theme-apollo</a>.</p></div></footer></div><script async src="//cdn.bootcss.com/mathjax/2.7.0/MathJax.js?config=TeX-MML-AM_CHTML" integrity="sha384-crwIf/BuaWM9rM65iM+dWFldgQ1Un8jWZMuh3puxb8TOY9+linwLoI7ZHZT+aekW" crossorigin="anonymous"></script></body></html>

@@ -1,0 +1,86 @@
+<!DOCTYPE html><html lang="zh-cn"><head><meta name="generator" content="Hexo 3.9.0"><meta charset="utf-8"><meta name="X-UA-Compatible" content="IE=edge"><title> G1垃圾收集器详解 · 房东的小黑</title><meta name="description" content="G1垃圾收集器详解 - Mara Tong"><meta name="viewport" content="width=device-width, initial-scale=1"><link rel="icon" href="/favicon.png"><link rel="stylesheet" href="/css/apollo.css"><link rel="search" type="application/opensearchdescription+xml" href="https://github.com/spurstong/atom.xml" title="房东的小黑"></head><body><div class="wrap"><header><a href="/" class="logo-link"><img src="/black.jpg" alt="logo"></a><ul class="nav nav-list"><li class="nav-list-item"><a href="/" target="_self" class="nav-list-link">BLOG</a></li><li class="nav-list-item"><a href="https://www.jianshu.com/u/a8d49bf62c45" target="_blank" class="nav-list-link">JIANSHU</a></li><li class="nav-list-item"><a href="https://github.com/spurstong" target="_blank" class="nav-list-link">GITHUB</a></li><li class="nav-list-item"><a href="/about" target="_self" class="nav-list-link">ABOUT</a></li><li class="nav-list-item"><a href="https://www.jianshu.com/u/a8d49bf62c45" target="_blank" class="nav-list-link">房东的小黑黑</a></li></ul><div class="mySign">加油</div></header><main class="container"><div class="post"><article class="post-block"><h1 class="post-title">G1垃圾收集器详解</h1><div class="post-info">2019年7月18日</div><div class="post-content"><p>G1是一款面向服务器应用的垃圾收集器，目标是用在多核、大内存的机器上。<br>它在满足高吞吐量的同时满足GC停顿的时间尽可能地短。<br>应用场景：</p>
+<ul>
+<li>可以像CMS收集器一样可以和应用并发运行</li>
+<li>压缩空闲的内存碎片，却不需要冗长的GC停顿。</li>
+<li>对GC停顿可以做更好的预测</li>
+</ul>
+<a id="more"></a>
+<h1 id="简介"><a href="#简介" class="headerlink" title="简介"></a>简介</h1><p>G1是一款面向服务器应用的垃圾收集器，目标是用在多核、大内存的机器上。<br>它在满足高吞吐量的同时满足GC停顿的时间尽可能地短。<br>应用场景：</p>
+<ul>
+<li>可以像CMS收集器一样可以和应用并发运行</li>
+<li>压缩空闲的内存碎片，却不需要冗长的GC停顿。</li>
+<li>对GC停顿可以做更好的预测</li>
+<li>不想牺牲大量的吞吐量性能</li>
+<li>不需要更大的Java Heap<h1 id="存储结构"><a href="#存储结构" class="headerlink" title="存储结构"></a>存储结构</h1>在传统的GC收集器（serial, parallel, CMS）都是把heap分成固定大小连续的三个空间： 年轻代，老年代和永久代。<br>在jdk8中，取消了永久代，改用了元空间。</li>
+</ul>
+<p><strong>永久代与元空间的区别</strong><br>在JDK8之前的HotSpot JVM，存放这些”永久的”的区域叫做“永久代(permanent generation)”。永久代是一片连续的堆空间，在JVM启动之前通过在命令行设置参数-XX:MaxPermSize来设定永久代最大可分配的内存空间，默认大小是64M（64位JVM由于指针膨胀，默认是85M）。永久代的垃圾收集是和老年代(old generation)捆绑在一起的，因此无论谁满了，都会触发永久代和老年代的垃圾收集。不过，一个明显的问题是，当JVM加载的类信息容量超过了参数-XX：MaxPermSize设定的值时，应用将会报OOM的错误。<br>而元空间是直接存在内存中，不在java虚拟机中的，因此元空间依赖于内存大小。当然你也可以自定义元空间大小。</p>
+<ul>
+<li><strong>元空间并不在虚拟机中</strong>，而是使用<strong>本地内存</strong>。</li>
+<li>因此，默认情况下，元空间的大小仅受本地内存限制，</li>
+<li>但可以通过以下参数来指定元空间的大小：- -XX:MetaspaceSize，初始空间大小，<ul>
+<li>-XX:MaxMetaspaceSize，最大空间，默认是没有限制的。</li>
+<li>-XX:MinMetaspaceFreeRatio，在GC之后，最小的Metaspace剩余空间容量的百分比</li>
+<li>-XX:MaxMetaspaceFreeRatio，在GC之后，最大的Metaspace剩余空间容量的百分比<br>取代的原因：</li>
+</ul>
+</li>
+</ul>
+<ol>
+<li>字符串存在永久代中，容易出现性能问题和内存溢出。</li>
+<li>类及方法的信息等比较难确定其大小，</li>
+</ol>
+<ul>
+<li>因此对于永久代的大小指定比较困难，- 太小容易出现永久代溢出，<ul>
+<li>太大则容易导致老年代溢出。</li>
+</ul>
+</li>
+</ul>
+<ol start="3">
+<li>永久代会为 GC 带来不必要的复杂度，并且回收效率偏低<br><img src="https://raw.githubusercontent.com/spurstong/img_data/master/G1%E5%9E%83%E5%9C%BE%E6%94%B6%E9%9B%86%E5%99%A8%E8%AF%A6%E8%A7%A3/1.png" alt="1.png"><br>G1将整个堆分成相同大小的分区。每个分区都可能是年轻代可也能是老年代，但在同一时刻只能属于某一个代。年轻代、幸存区和老年代等概念还存在，成为<strong>逻辑上的概念</strong>。在物理上不需要<strong>连续</strong>，堆内存中一个区域(Region)的大小可以通过-XX:G1HeapRegionSize参数指定，大小区间最小1M、最大32M，总之是2的幂次方。<br>G1是一种带压缩的收集器，在回收老年代的分区时，是将存活的对象从一个分区中拷贝到另一个可用分区，这个拷贝的过程就实现了局部的压缩。<br><img src="https://raw.githubusercontent.com/spurstong/img_data/master/G1%E5%9E%83%E5%9C%BE%E6%94%B6%E9%9B%86%E5%99%A8%E8%AF%A6%E8%A7%A3/2.png" alt="2.png"><br>每个Region被标记为E、S、O和H,这些区域在逻辑上被映射为Eden,Survivor和老年代。除此之外，还添加了另外一种类型，被称为（Humongous Region）。它是为了存储超过50%religon大小对象而设计的，而这些对象被称为巨型对象。如果一个H区装不下一个巨型对象，那么G1会寻找连续的H分区来存储。为了能找到连续的H区，有时候不得不启动Full GC。</li>
+</ol>
+<p><strong>收集集合（Cset)</strong><br>一组可被回收的分区的集合。在Cset中存活的数据会在GC过程中被移动到另一个可用分区，Cset中的分区可以来自Eden空间、survivor空间或者老年代。Cset会占用不到整个堆空间的1%大小。<br><strong>Remembered Set(已记忆集合)</strong><br>RSet记录了其他Region中的对象引用本Region中对象的关系，属于points-into结构，而在CMS中使用了Card Table的结构，里面记录了老年代对象到新生代的引用。Card Table的结构是一个连续的byte[]数组，扫描Card Table的时间比扫描整个老年代的代价要小很多。Card Table属于points-out(我引用了谁的对象)的结构。每个Region都会记录下别的Region有指向自己的指针，并标记这些指针分别在哪些Card的范围内。这个RSet其实是一个Hash Table,key是别的Region的起始地址，Value是一个集合，里面的元素是Card Table的Index。每个Region都有一个对应的Rset。<br>RSet究竟是怎么辅助GC的呢？在做YGC的时候，只需要选定young generation region的RSet作为根集，这些RSet记录了old-&gt;young的跨代引用，避免了扫描整个old generation。 而mixed gc的时候，old generation中记录了old-&gt;old的RSet，young-&gt;old的引用由扫描全部young generation region得到，这样也不用扫描全部old generation region。所以RSet的引入大大减少了GC的工作量。</p>
+<p><img src="https://raw.githubusercontent.com/spurstong/img_data/master/G1%E5%9E%83%E5%9C%BE%E6%94%B6%E9%9B%86%E5%99%A8%E8%AF%A6%E8%A7%A3/3.png" alt="3.png"></p>
+<h1 id="Snapshot-At-The-Begining"><a href="#Snapshot-At-The-Begining" class="headerlink" title="Snapshot-At-The-Begining"></a>Snapshot-At-The-Begining</h1><p>它是GC开始时活着的对象的一个快照。他是通过Root Tracing得到的，作用是<strong>维持并发GC的正确性</strong>。<br>它是根据三色标记算法，把对象设置为了三种状态：</p>
+<ul>
+<li>白：对象没有被标记到，标记阶段结束后，会被当做垃圾回收掉。</li>
+<li>灰： 对象被标记了，但是它的field还没有被标记或标记完</li>
+<li>黑： 对象被标记了，并且它的所有field也被标记完了。<br>垃圾收集器的工作过程，就是通过灰色对象的指针扫描它指向的白色对象，如果找到一个白色对象，就将它设置为灰色，如果某个灰色对象的可达对象已经全部找完，就将它设置为黑色对象。当在当前集合中找不到灰色的对象时，就说明该集合的回收动作完成，然后所有白色的对象的都会被回收。</li>
+</ul>
+<p>由于并发阶段的存在，Mutator和Garbage Collector线程同时对对象进行修改，就会出现白对象漏标的情况，这种情况发生的前提是：</p>
+<ul>
+<li>Mutator赋予一个黑对象该白对象的引用。</li>
+<li>Mutator删除了所有从灰对象到该白对象的直接或者间接引用。</li>
+</ul>
+<p>对于第一个条件，在并发标记阶段，如果该白对象是new出来的，并没有被灰对象持有，那么它会不会被漏标呢？Region中有两个top-at-mark-start（TAMS）指针，分别为prevTAMS和nextTAMS。在TAMS以上的对象是新分配的，这是一种隐式的标记。对于在GC时已经存在的白对象，如果它是活着的，它必然会被另一个对象引用，即条件二中的灰对象。如果灰对象到白对象的直接引用或者间接引用被替换了，或者删除了，白对象就会被漏标，从而导致被回收掉，这是非常严重的错误，所以SATB破坏了第二个条件。也就是说，一个对象的引用被替换时，可以通过write barrier 将旧引用记录下来。<br>SATB也是有副作用的，如果被替换的白对象就是要被收集的垃圾，这次的标记会让它躲过GC，这就是float garbage。因为SATB的做法精度比较低，所以造成的float garbage也会比较多。</p>
+<h1 id="G1的GC模式"><a href="#G1的GC模式" class="headerlink" title="G1的GC模式"></a>G1的GC模式</h1><p> <strong>1.YoungGC年轻代收集</strong><br>在分配一般对象（非巨型对象）时，当所有eden region使用达到最大阀值并且无法申请足够内存时，会触发一次YoungGC。每次younggc会回收所有Eden以及Survivor区，并且将存活对象复制到Old区以及另一部分的Survivor区。</p>
+<p><strong>YoungGC的回收过程如下：</strong></p>
+<ul>
+<li>根扫描,跟CMS类似，Stop the world，扫描GC Roots对象。</li>
+<li>处理Dirty card,更新RSet.</li>
+<li>扫描RSet,扫描RSet中所有old区对扫描到的young区或者survivor去的引用。</li>
+<li>拷贝扫描出的存活的对象到survivor2/old区</li>
+<li>处理引用队列，软引用，弱引用，虚引用</li>
+</ul>
+<p><strong>2. mixed gc</strong></p>
+<p>当越来越多的对象晋升到老年代old region时，为了避免堆内存被耗尽，虚拟机会触发一个混合的垃圾收集器，即mixed gc，该算法并不是一个old gc，除了回收整个young region，还会回收一部分的old region，这里需要注意：是一部分老年代，而不是全部老年代，可以选择哪些old region进行收集，从而可以对垃圾回收的耗时时间进行控制。</p>
+<p>G1没有fullGC概念，需要fullGC时，调用serialOldGC进行全堆扫描（包括eden、survivor、o、perm）。</p>
+<h1 id="G1与CMS的区别"><a href="#G1与CMS的区别" class="headerlink" title="G1与CMS的区别"></a>G1与CMS的区别</h1><ol>
+<li><p>CMS中，堆被分为PermGen，YoungGen，OldGen；而YoungGen又分了两个survivo区域。在G1中，堆被平均分成几个区域(region)，在每个区域中，虽然也保留了新老代的概念，但是收集器是以整个区域为单位收集的。</p>
+</li>
+<li><p>CMS是一款“标记–清除”算法实现的收集器，容易出现大量空间碎片。当空间碎片过多，将会给大对象分配带来很大的麻烦,而G1则不会容易产生大量空间碎片。</p>
+</li>
+<li><p>G1会在Young GC和Mixed GC中使用、而CMS只能在O区使用。(有待商榷，上文中讲CMS也会在年轻代中处理)</p>
+</li>
+<li><p>G1能建立可预测的停顿时间模型，能让使用者明确指定在一个长度为M毫秒的时间片段内，消耗在垃圾收集上的时间不得超过N毫秒</p>
+</li>
+<li><p>在空间整理方面，与CMS的“标记–清理”算法不同，G1从整体上来看是基于“标记-整理”算法实现的收集器，从局部（两个Region之间）上来看是基于“复制”算法实现的。</p>
+</li>
+</ol>
+</div></article></div></main><footer><div class="paginator"><a href="/2019/07/20/jvm类加载机制/" class="prev">上一篇</a><a href="/2019/07/17/jvm垃圾收集器/" class="next">下一篇</a></div><div id="disqus_thread"></div><script>var disqus_shortname = 'seansun';
+var disqus_identifier = '2019/07/18/G1垃圾收集器详解/';
+var disqus_title = 'G1垃圾收集器详解';
+var disqus_url = 'https://github.com/spurstong/2019/07/18/G1垃圾收集器详解/';
+(function() {
+    var dsq = document.createElement('script'); dsq.type = 'text/javascript'; dsq.async = true;
+    dsq.src = '//' + disqus_shortname + '.disqus.com/embed.js';
+    (document.getElementsByTagName('head')[0] || document.getElementsByTagName('body')[0]).appendChild(dsq);
+})();</script><script id="dsq-count-scr" src="//seansun.disqus.com/count.js" async></script><div class="copyright"><p>© 2018 - 2019 <a href="https://github.com/spurstong">Mara Tong</a>, powered by <a href="https://hexo.io/" target="_blank">Hexo</a> and <a href="https://github.com/pinggod/hexo-theme-apollo" target="_blank">hexo-theme-apollo</a>.</p></div></footer></div><script async src="//cdn.bootcss.com/mathjax/2.7.0/MathJax.js?config=TeX-MML-AM_CHTML" integrity="sha384-crwIf/BuaWM9rM65iM+dWFldgQ1Un8jWZMuh3puxb8TOY9+linwLoI7ZHZT+aekW" crossorigin="anonymous"></script></body></html>

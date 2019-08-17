@@ -1,0 +1,101 @@
+<!DOCTYPE html><html lang="zh-cn"><head><meta name="generator" content="Hexo 3.9.0"><meta charset="utf-8"><meta name="X-UA-Compatible" content="IE=edge"><title> java虚拟机内存模型及垃圾 · 房东的小黑</title><meta name="description" content="java虚拟机内存模型及垃圾 - Mara Tong"><meta name="viewport" content="width=device-width, initial-scale=1"><link rel="icon" href="/favicon.png"><link rel="stylesheet" href="/css/apollo.css"><link rel="search" type="application/opensearchdescription+xml" href="https://github.com/spurstong/atom.xml" title="房东的小黑"></head><body><div class="wrap"><header><a href="/" class="logo-link"><img src="/black.jpg" alt="logo"></a><ul class="nav nav-list"><li class="nav-list-item"><a href="/" target="_self" class="nav-list-link">BLOG</a></li><li class="nav-list-item"><a href="https://www.jianshu.com/u/a8d49bf62c45" target="_blank" class="nav-list-link">JIANSHU</a></li><li class="nav-list-item"><a href="https://github.com/spurstong" target="_blank" class="nav-list-link">GITHUB</a></li><li class="nav-list-item"><a href="/about" target="_self" class="nav-list-link">ABOUT</a></li><li class="nav-list-item"><a href="https://www.jianshu.com/u/a8d49bf62c45" target="_blank" class="nav-list-link">房东的小黑黑</a></li></ul><div class="mySign">加油</div></header><main class="container"><div class="post"><article class="post-block"><h1 class="post-title">java虚拟机内存模型及垃圾</h1><div class="post-info">2019年7月15日</div><div class="post-content"><p>虚拟机是一种抽象化的计算机，通过在实际的计算机上仿真模拟各种计算机功能来实现的。Java虚拟机有自己完善的硬体架构，如处理器、堆栈、寄存器等，还具有相应的指令系统。Java虚拟机屏蔽了与具体操作系统平台相关的信息，使得Java程序只需生成在Java虚拟机上运行的目标代码（字节码），就可以在多种平台上不加修改地运行。</p>
+<a id="more"></a>
+<p>jvm是什么，百度百科这样写道：<br>虚拟机是一种抽象化的计算机，通过在实际的计算机上仿真模拟各种计算机功能来实现的。Java虚拟机有自己完善的硬体架构，如处理器、堆栈、寄存器等，还具有相应的指令系统。Java虚拟机屏蔽了与具体操作系统平台相关的信息，使得Java程序只需生成在Java虚拟机上运行的目标代码（字节码），就可以在多种平台上不加修改地运行。<br>简单通俗的说，jvm类似一个中间件，为程序和各个操作系统之间架起了一个桥梁，不需要为特定的系统编写特定的代码。</p>
+<h1 id="jvm内存模型"><a href="#jvm内存模型" class="headerlink" title="jvm内存模型"></a>jvm内存模型</h1><p>jvm主要包括五大模块，类装载器子系统、运行时数据区、执行引擎、本地方法接口和垃圾收集模块。<br>在本节中主要讲解运行时数据区的数据结构。<br><img src="https://raw.githubusercontent.com/spurstong/img_data/master/java%E8%99%9A%E6%8B%9F%E6%9C%BA%E5%86%85%E5%AD%98%E6%A8%A1%E5%9E%8B/1.png" alt="1.png"></p>
+<ul>
+<li>程序计数器</li>
+</ul>
+<ol>
+<li>是线程私有的，各个线程之间计数器互不影响，独立存储</li>
+<li>如果线程执行的是java方法，则记录的是正在执行的虚拟机字节码指令的地址；如果执行的是Native方法，这个计数器值为空。</li>
+<li>是唯一一个在jvm规范中没有规定任何OutOfMemoryError情况的区域</li>
+</ol>
+<ul>
+<li>虚拟机栈</li>
+</ul>
+<ol>
+<li>线程私有的，生命周期与线程相同</li>
+<li>当执行一个方法时，都会创建一个栈帧</li>
+<li>可以存储局部变量表、操作数栈、动态链接和方法出口等<br><img src="https://raw.githubusercontent.com/spurstong/img_data/master/java%E8%99%9A%E6%8B%9F%E6%9C%BA%E5%86%85%E5%AD%98%E6%A8%A1%E5%9E%8B/2.png" alt="2.png"></li>
+</ol>
+<ul>
+<li>本地方法栈</li>
+</ul>
+<ol>
+<li>线程私有的</li>
+<li>与虚拟机栈的作用类似，当执行Native方法时会用到</li>
+</ol>
+<ul>
+<li>java堆</li>
+</ul>
+<ol>
+<li>是内存管理中最大的一块</li>
+<li>存放的是对象的实例和数组对象</li>
+<li>java堆按照生命周期的不同，划分为新生代和老年代。当新生代中经过多次垃圾回收仍然存活的对象九华转化成老年代 。</li>
+<li>年轻代又分为Eden和Survivor区。Survivor区由FromSpace和ToSpace组成。Eden区占大容量，Survivor两个区占小容量，默认比例是8:1:1</li>
+<li>新生成的对象首先放到年轻代Eden区，当Eden空间满了，触发Minor GC，存活下来的对象移动到Survivor0区，Survivor0区满后触发执行Minor GC，Survivor0区存活对象移动到Suvivor1区，这样保证了一段时间内总有一个survivor区为空。经过多次Minor GC仍然存活的对象移动到老年代。</li>
+<li>老年代存储长期存活的对象，占满时会触发Major GC = Full GC，GC期间会停止所有线程等待GC完成，</li>
+<li>将对象根据存活概率进行分类，对存活时间长的对象，放在固定区，从而减少扫描垃圾时间及GC频率，针对分类进行不同的垃圾回收算法。</li>
+<li>在新生代中，每次垃圾收集中都会发现大批对象死去，只有少量存活，所有采用了复制算法</li>
+<li>而老年代中因为对象存活率高，没有额外空间对它进行分配担保，就必须使用“标记–清理”或者“标记–整理“算法进行回收。<br><img src="https://raw.githubusercontent.com/spurstong/img_data/master/java%E8%99%9A%E6%8B%9F%E6%9C%BA%E5%86%85%E5%AD%98%E6%A8%A1%E5%9E%8B/3.png" alt="3.png"></li>
+</ol>
+<ul>
+<li>方法区</li>
+</ul>
+<ol>
+<li>是各个线程共享的内存区域</li>
+<li>非堆内存，用于存储已被虚拟机加载的类信息、常量、静态变量等。</li>
+<li>在jdk1.8中废除了方法区，替代是元空间，它的本质和方法区类似，但它并不在虚拟机中，而是在本地内存中，默认情况下，元空间的大小仅受本地内存的限制。</li>
+</ol>
+<h1 id="HotSpot虚拟机对象"><a href="#HotSpot虚拟机对象" class="headerlink" title="HotSpot虚拟机对象"></a>HotSpot虚拟机对象</h1><ol>
+<li>虚拟机遇到一条new指令时，首先将去检查这个指令的参数是否能在<strong>常量池</strong>中定位到一个类的符号引用，并且检查这个符号引用代表的类是否已被<strong>加载、解析和初始化</strong>过，如果没有，那必须先执行相应的类加载过程。</li>
+<li>在为新生对象分配空间时，主要有两种方式。<strong>指针碰撞</strong>和<strong>空闲列表</strong></li>
+<li>并发情况下的对象创建问题。为了保证操作的正确性，一种采取对分配内存空间的动作进行同步处理-实际上虚拟机采用CAS配上失败重试的方法保证更新操作的原子性；另一种是把内存分配的动作按照<strong>线程</strong>划分到不同的空间之中进行，即每个线程在java堆中预先分配一小块内存，称为本地线程分配缓冲（TLAB）。哪个线程要分配内存，就在哪个线程的TLAb上分配，只有TLAB用完并分配新的TLAB时，才需要同步锁定。<br><img src="https://raw.githubusercontent.com/spurstong/img_data/master/java%E8%99%9A%E6%8B%9F%E6%9C%BA%E5%86%85%E5%AD%98%E6%A8%A1%E5%9E%8B/4.png" alt="4.png"></li>
+</ol>
+<ul>
+<li>对象的内存布局<br>在hotspot虚拟机中，主要分为3块区域：对象头、实例数据和对齐填充<br>对象头主要分为两部分信息，一部分是存储对象自身的运行时数据，另一部分是类型指针。</li>
+</ul>
+<p><img src="https://raw.githubusercontent.com/spurstong/img_data/master/java%E8%99%9A%E6%8B%9F%E6%9C%BA%E5%86%85%E5%AD%98%E6%A8%A1%E5%9E%8B/5.png" alt="5.png"></p>
+<ul>
+<li>对象的访问定位<br>java程序通过栈上的reference数据来操作堆上的具体对象。它是一个指向对象的引用，但如何通过这个引用去定位、访问堆中的具体对象，这是不确定的，取决于虚拟机的类型。当前主要有两种方式：<strong>使用句柄</strong>和<strong>直接指针</strong></li>
+</ul>
+<ol>
+<li>使用句柄，会在java堆中划分出一块内存来作为<strong>句柄池</strong>，在句柄中包含了对象实例数据和对象类型数据的地址信息。</li>
+</ol>
+<p><img src="https://raw.githubusercontent.com/spurstong/img_data/master/java%E8%99%9A%E6%8B%9F%E6%9C%BA%E5%86%85%E5%AD%98%E6%A8%A1%E5%9E%8B/6.png" alt="6.png"></p>
+<ol start="2">
+<li>使用直接指针访问，在reference中存储的是<strong>对象地址</strong>,在对象实例数据中存储了到对象类型数据的指针。<br><img src="https://raw.githubusercontent.com/spurstong/img_data/master/java%E8%99%9A%E6%8B%9F%E6%9C%BA%E5%86%85%E5%AD%98%E6%A8%A1%E5%9E%8B/7.png" alt="7.png"><h1 id="垃圾回收"><a href="#垃圾回收" class="headerlink" title="垃圾回收"></a>垃圾回收</h1>利用垃圾收集器对堆进行回收前，首先要确定的是哪些对象还存活着，哪些对象已经“死去”。<br>起初典型的算法是<strong>引用计数算法</strong> ，它为每个对象添加一个引用计数器，每当有一个地方引用它时，计数器就加1；当引用失效时，计数器就减1，当计数器为0时就是不可能再被使用了。但在某些情况下会出现一些错误，当对象间有相互循环引用时，会相互引用着对方，导致它们的引用计数都不为0。</li>
+</ol>
+<p><strong>可达性分析算法</strong><br>该算法通过一系列的称为“GC Roots”的对象作为起始点，从这些节点开始向下搜索，搜索所走过的路径称为引用链，当一个对象到GC Roots没有任何引用链相连时，则证明此对象是不可用的。<br><img src="https://raw.githubusercontent.com/spurstong/img_data/master/java%E8%99%9A%E6%8B%9F%E6%9C%BA%E5%86%85%E5%AD%98%E6%A8%A1%E5%9E%8B/8.png" alt="8.png"><br>在java语言中，可作为GC Roots的对象有下面几种：</p>
+<ul>
+<li><strong>虚拟机栈</strong>（栈帧中的本地变量表）中的引用对象</li>
+<li>方法区中<strong>类静态属性</strong>引用的对象</li>
+<li>方法区中<strong>常量</strong>引用的对象</li>
+<li>本地方法栈JNI(即一般说的Native方法)引用的对象</li>
+</ul>
+<p><strong>一个对象真正死亡，至少要经历两次标记记录</strong><br>第一次： 在进行可达性分析后发现没有与GC Roots相连接的引用链，那它会被第一次标记并进行筛选，筛选的条件是此对象是否有必要执行的finalize()方法。当对象没有覆盖finalize()方法或者finalize()方法已经被虚拟机调用过，虚拟机将这两种情况都视为“没有必要执行”。<br>第二次： 当这个对象被判定为有必要执行finalize()方法 ，那么这个对象将会放置在一个F-Queue的队列中，如果该对象重新与<strong>引用链</strong>上的任意一个对象建立关联时，它就可以从“即将回收”的集合中移除。</p>
+<h1 id="垃圾回收算法"><a href="#垃圾回收算法" class="headerlink" title="垃圾回收算法"></a>垃圾回收算法</h1><ol>
+<li>标记-清除算法<br>首先标记出所有需要回收的对象，在标记完成后统一回收所有所标记的对象</li>
+</ol>
+<p><img src="https://raw.githubusercontent.com/spurstong/img_data/master/java%E8%99%9A%E6%8B%9F%E6%9C%BA%E5%86%85%E5%AD%98%E6%A8%A1%E5%9E%8B/9.png" alt="9.png"></p>
+<ol start="2">
+<li>复制算法<br>它将可用内存按容量划分为大小相等的两块，每次只使用其中的一块，当这一块的内存用完时，就将还存活的对象复制到另外一块上，然后再把已使用过的内存空间一次清理掉。</li>
+</ol>
+<p><img src="https://raw.githubusercontent.com/spurstong/img_data/master/java%E8%99%9A%E6%8B%9F%E6%9C%BA%E5%86%85%E5%AD%98%E6%A8%A1%E5%9E%8B/10.png" alt="10.png"></p>
+<ol start="3">
+<li>标记-整理算法<br>当标记完待回收对象后，让所有存活的对象都向一端移动，然后直接清理掉端边界意外的内存，</li>
+</ol>
+<p><strong>不是直接对可回收对象进行清理。</strong><br><img src="https://raw.githubusercontent.com/spurstong/img_data/master/java%E8%99%9A%E6%8B%9F%E6%9C%BA%E5%86%85%E5%AD%98%E6%A8%A1%E5%9E%8B/11.png" alt="11.png"></p>
+<ol start="4">
+<li>分代收集算法<br>新生代采用复制算法，在老年代采用“标记－清除”或者“标记－整理”算法。新生代分为Eden区和两个相同大小的Survivor区，</li>
+</ol>
+<p><strong>所有新创建的对象都分配在Eden区域中</strong>。当Eden区域满后会触发minor GC，将Eden区仍然存活的对象复制到其中一个Survivor区域中，另外一个Survivor区中的存活对象也复制到这个Survivor区域中，并始终保持一个Survivor区是空的。</p>
+</div></article></div></main><footer><div class="paginator"><a href="/2019/07/17/jvm垃圾收集器/" class="prev">上一篇</a><a href="/2019/07/02/线程间通信之wait、notify/" class="next">下一篇</a></div><div id="disqus_thread"></div><script>var disqus_shortname = 'seansun';
+var disqus_identifier = '2019/07/15/java虚拟机内存模型/';
+var disqus_title = 'java虚拟机内存模型及垃圾';
+var disqus_url = 'https://github.com/spurstong/2019/07/15/java虚拟机内存模型/';
+(function() {
+    var dsq = document.createElement('script'); dsq.type = 'text/javascript'; dsq.async = true;
+    dsq.src = '//' + disqus_shortname + '.disqus.com/embed.js';
+    (document.getElementsByTagName('head')[0] || document.getElementsByTagName('body')[0]).appendChild(dsq);
+})();</script><script id="dsq-count-scr" src="//seansun.disqus.com/count.js" async></script><div class="copyright"><p>© 2018 - 2019 <a href="https://github.com/spurstong">Mara Tong</a>, powered by <a href="https://hexo.io/" target="_blank">Hexo</a> and <a href="https://github.com/pinggod/hexo-theme-apollo" target="_blank">hexo-theme-apollo</a>.</p></div></footer></div><script async src="//cdn.bootcss.com/mathjax/2.7.0/MathJax.js?config=TeX-MML-AM_CHTML" integrity="sha384-crwIf/BuaWM9rM65iM+dWFldgQ1Un8jWZMuh3puxb8TOY9+linwLoI7ZHZT+aekW" crossorigin="anonymous"></script></body></html>
