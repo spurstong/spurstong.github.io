@@ -49,7 +49,7 @@
 </li>
 </ol>
 <p>从中可以看出中间最重要的方法是<em>loadBeanDefinitions</em><br>将加载XML文件中的bean信息交给<strong>XmlBeanDefinitionReader</strong>来处理。<br>它会依次读取每个xml配置文件中的bean信息，<br>将xml文件转化为一个InputStream,再转化为InputSource,进而转化为一个Document对象，该对象保存着各个XML文件中各个节点和子节点的相关信息，然后获取到Document的根节点信息，调用<code>BeanDefinitionDocumentReader.registerBeanDefinitions(root)</code>进行注册。<br>然后开始解析xml文件，封装成BeanDefinition并完成注册，该点在文章开头已经讲解。</p>
-</div></article></div></main><footer><div class="paginator"><a href="/2019/08/17/Spring源码之Bean加载解析/" class="next">下一篇</a></div><div id="disqus_thread"></div><script>var disqus_shortname = 'seansun';
+</div></article></div></main><footer><div class="paginator"><a href="/2019/08/24/Spring源码之Bean加载/" class="prev">上一篇</a><a href="/2019/08/17/Spring源码之Bean加载解析/" class="next">下一篇</a></div><div id="disqus_thread"></div><script>var disqus_shortname = 'seansun';
 var disqus_identifier = '2019/08/23/Spring源码之bean标签的解析与注册/';
 var disqus_title = 'Spring源码之bean标签的解析与注册';
 var disqus_url = 'https://github.com/spurstong/2019/08/23/Spring源码之bean标签的解析与注册/';
