@@ -2,6 +2,20 @@
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
   
   <url>
+    <loc>https://github.com/spurstong/2019/09/04/Spring%20AOP%E7%9A%84AopProxy%E4%BB%A3%E7%90%86%E5%AF%B9%E8%B1%A1/</loc>
+    
+    <lastmod>2019-09-07T08:00:18.794Z</lastmod>
+    
+  </url>
+  
+  <url>
+    <loc>https://github.com/spurstong/2019/08/26/Spring%E4%B9%8Bbean%E7%9A%84%E7%94%9F%E5%91%BD%E5%91%A8%E6%9C%9F%E5%8F%8AInitializingBean%E7%AD%89%E6%8E%A5%E5%8F%A3%E7%9A%84%E4%BD%9C%E7%94%A8/</loc>
+    
+    <lastmod>2019-08-29T11:14:08.642Z</lastmod>
+    
+  </url>
+  
+  <url>
     <loc>https://github.com/spurstong/2019/08/26/Spring%E6%BA%90%E7%A0%81%E5%88%86%E6%9E%90%E4%B9%8Blazy-init/</loc>
     
     <lastmod>2019-08-26T14:44:20.615Z</lastmod>
