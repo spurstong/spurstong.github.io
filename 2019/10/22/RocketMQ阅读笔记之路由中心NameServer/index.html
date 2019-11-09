@@ -36,7 +36,7 @@
 <li>注册Broker的过滤器Server地址列表，一个Broker上会关联多个FilterServer消息过滤服务器。</li>
 </ul>
 <h1 id="路由删除"><a href="#路由删除" class="headerlink" title="路由删除"></a>路由删除</h1><p>NameServer会每隔10s扫描brokerLiveTable状态表，如果BrokerLive的lastUpdateTimestamp的时间戳距当前时间超过120s,则认为Broker失效，移除该Broker,关闭与Broker连接，并同时更新topicQueueTable、brokerAddrTable、brokerLiveTable、filterServerTable。</p>
-</div></article></div></main><footer><div class="paginator"><a href="/2019/10/22/HashTable源码分析/" class="next">下一篇</a></div><div id="disqus_thread"></div><script>var disqus_shortname = 'seansun';
+</div></article></div></main><footer><div class="paginator"><a href="/2019/10/31/RocketMQ阅读笔记之消息发送/" class="prev">上一篇</a><a href="/2019/10/22/HashTable源码分析/" class="next">下一篇</a></div><div id="disqus_thread"></div><script>var disqus_shortname = 'seansun';
 var disqus_identifier = '2019/10/22/RocketMQ阅读笔记之路由中心NameServer/';
 var disqus_title = 'RocketMQ阅读笔记之路由中心NameServer';
 var disqus_url = 'https://github.com/spurstong/2019/10/22/RocketMQ阅读笔记之路由中心NameServer/';
