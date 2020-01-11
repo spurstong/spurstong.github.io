@@ -1,0 +1,53 @@
+<!DOCTYPE html><html lang="zh-cn"><head><meta name="generator" content="Hexo 3.9.0"><meta charset="utf-8"><meta name="X-UA-Compatible" content="IE=edge"><title> redo日志、undo日志、binlog日志与doublewrite分析 · 房东的小黑</title><meta name="description" content="redo日志、undo日志、binlog日志与doublewrite分析 - Mara Tong"><meta name="viewport" content="width=device-width, initial-scale=1"><link rel="icon" href="/favicon.png"><link rel="stylesheet" href="/css/apollo.css"><link rel="search" type="application/opensearchdescription+xml" href="https://github.com/spurstong/atom.xml" title="房东的小黑"></head><body><div class="wrap"><header><a href="/" class="logo-link"><img src="/black.jpg" alt="logo"></a><ul class="nav nav-list"><li class="nav-list-item"><a href="/" target="_self" class="nav-list-link">BLOG</a></li><li class="nav-list-item"><a href="https://www.jianshu.com/u/a8d49bf62c45" target="_blank" class="nav-list-link">JIANSHU</a></li><li class="nav-list-item"><a href="https://github.com/spurstong" target="_blank" class="nav-list-link">GITHUB</a></li><li class="nav-list-item"><a href="/about" target="_self" class="nav-list-link">ABOUT</a></li><li class="nav-list-item"><a href="https://www.jianshu.com/u/a8d49bf62c45" target="_blank" class="nav-list-link">房东的小黑黑</a></li></ul><div class="mySign">路途虽遥远，将来更美好</div></header><main class="container"><div class="post"><article class="post-block"><h1 class="post-title">redo日志、undo日志、binlog日志与doublewrite分析</h1><div class="post-info">2020年1月11日</div><div class="post-content"><h1 id="binlog日志-（二进制日志）"><a href="#binlog日志-（二进制日志）" class="headerlink" title="binlog日志 （二进制日志）"></a>binlog日志 （二进制日志）</h1><p>二进制日志记录了对MySQL数据库<strong>执行更改的所有操作</strong>，它是一种逻辑操作，其记录的是对应的SQL语句。但是，不会记录SELECT和SHOW这类操作，因为这类操作对数据本身并没有修改。</p>
+<h2 id="二进制文件格式"><a href="#二进制文件格式" class="headerlink" title="二进制文件格式"></a>二进制文件格式</h2><p>MySQL通过binlog_format参数来设置二进制文件格式。</p>
+<ul>
+<li><strong>STATEMENT格式</strong>。 最基础的版本。它记录的是日志的逻辑SQL语句。</li>
+<li><strong>ROW格式</strong>。记录的不是简单的逻辑SQL语句，而是记录表的行更改情况，记录的是表中每个字段的值。</li>
+<li><strong>MIXED格式</strong>。MySQL默认采用STATEMENT格式进行记录，但是一旦判断可能会有数据不一致的情况，则会有ROW格式来记录。</li>
+</ul>
+<h2 id="二进制文件的用途"><a href="#二进制文件的用途" class="headerlink" title="二进制文件的用途"></a>二进制文件的用途</h2><ul>
+<li><strong>恢复</strong>。某些数据的恢复需要二进制文件。</li>
+<li><strong>复制</strong>。通过复制和执行二进制文件进行两个数据库之间的实时同步。</li>
+<li><strong>审计</strong>。判断是否有对数据库进行注入的攻击。</li>
+</ul>
+<p>在默认情况下，二进制文件并不是在每次写的时候同步到磁盘中。因此，当数据库所在操作系统发生宕机时，可能会有最后一部分数据没有写入到二进制日志文件中，这会给恢复和复制带来问题。<br>所有未提交的二进制日志会被记录到一个缓存中，等该事务提交时直接将缓存的二进制日志写入二进制日志文件，而该缓存的大小由binlog_cache_size决定。</p>
+<h1 id="Redo日志"><a href="#Redo日志" class="headerlink" title="Redo日志"></a>Redo日志</h1><p>binlog主要用来做数据归档，但它不具备崩溃恢复的能力，如果你的系统突然崩溃宕机，重启后可能会有部分数据丢失，而Redo日志能够有效解决这个问题。可以把它看做一种恢复操作，它恢复提交事务修改的页操作。大部分情况下，Redo是<strong>物理日志</strong>，记录的是数据页的物理操作。<br>它主要有两部分：（1）重做日志缓冲，其是丢失的；（2）重做日志文件，其是持久的。</p>
+<h2 id="Redo的整体流程"><a href="#Redo的整体流程" class="headerlink" title="Redo的整体流程"></a>Redo的整体流程</h2><ol>
+<li>先将原始数据从磁盘中读入内存中，修改数据的内存拷贝</li>
+<li>生成一条重做日志并写入重做日志缓存中，记录的是数据被修改后的值</li>
+<li>当事务提交时，将重做日志缓存中的内容刷新追加到重做日志文件中。</li>
+<li>定期将内存中修改的数据刷新到磁盘中。<h2 id="何时写入到Redo-重做日志文件-中"><a href="#何时写入到Redo-重做日志文件-中" class="headerlink" title="何时写入到Redo(重做日志文件)中"></a>何时写入到Redo(重做日志文件)中</h2></li>
+</ol>
+<ul>
+<li>master thread 每一秒将重做日志缓存刷新到重做日志文件中。</li>
+<li>每次事务提交时。</li>
+<li>当重做日志缓存池剩余空间小于1/2时。</li>
+</ul>
+<h2 id="Redo日志与二进制日志的不同"><a href="#Redo日志与二进制日志的不同" class="headerlink" title="Redo日志与二进制日志的不同"></a>Redo日志与二进制日志的不同</h2><p>从表面上看，它们非常相似，都是记录了数据库操作的日志，但从本质上看，两者有非常大的不同。</p>
+<ol>
+<li><strong>产生位置不同</strong>。重做日志是在InnoDB存储引擎层中产生，而二进制日志是在MySQL数据库的上层产生。</li>
+<li><strong>记录的内容形式不同</strong>。二进制日志是一种逻辑日志，其记录的是对应的SQL语句，但是在ROW格式下，它记录的是物理文件；而重做日志是物理格式日志，其记录的是对于每个页的修改。</li>
+<li><strong>写入磁盘的时间点不同</strong>。二进制日志只是在事务提交完成后进行一次写入，而InnoDB存储引擎的重做日志在事务进行中不断被写入，</li>
+</ol>
+<h1 id="Undo日志"><a href="#Undo日志" class="headerlink" title="Undo日志"></a>Undo日志</h1><p>当用户执行的事务或语句由于某种原因失败时，又或者用户用一条ROLLBACK语句请求回滚，就可以利用这些undo信息将数据回滚到修改之前的样子。还有一个作用是MVCC。</p>
+<p>undo存放在数据库内部的一个特殊段中，成为undo端（undo segment）。undo是逻辑日志，因此只是将数据库逻辑地恢复到原来的样子。所有修改都被逻辑地取消了，但是数据结构和页本身在回滚之后可能大不相同。<br>在MVCC中，当用户读取一行记录时，若该记录已经被其他事务占用，当前事务可以通过undo读取之前的行版本信息，以此实现非锁定读。</p>
+<h2 id="undo-log格式"><a href="#undo-log格式" class="headerlink" title="undo log格式"></a>undo log格式</h2><ul>
+<li><p>insert undo log<br>是指在insert操作中产生的undo log。因为insert操作的记录，只对事务本身可见，对其他事务不可见，故该undo log可以在事务提交后直接删除，不需要进行purge操作。</p>
+</li>
+<li><p>updae undo log<br>记录的是对delete和update操作产生的undo log。该undo log可能需要提供MVCC机制，因此不能在事务提交时就进行删除，提交时放入到undo log链表，等待purge线程进行最后的删除。</p>
+</li>
+</ul>
+<h2 id="purge"><a href="#purge" class="headerlink" title="purge"></a>purge</h2><p>例如语句：</p>
+<figure class="highlight sql"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">delete</span> <span class="keyword">from</span> t <span class="keyword">where</span> a = <span class="number">1</span>;</span><br></pre></td></tr></table></figure>
+
+<p>其中，表t上列a有聚集索引，列b上有辅助索引。当执行delete删除操作时，仅是将主键列等于1的记录delete flag设置为1，记录并没有被删除，即记录还是存在于B+树中，其次，对于辅助索引上列a等于1，b等于1的记录同样没有做任何处理，甚至没有产生undo log。而真正删除这行记录的操作其实被“延迟”了，在purge操作中完成。<br>在MVCC下，有可能其他事务也在引用该行记录，故InnoDB需要保存记录之前的版本，当该条记录不被任何事务所引用时，那么可以执行真正的delete操作。</p>
+<h1 id="doublewrite-两次写"><a href="#doublewrite-两次写" class="headerlink" title="doublewrite(两次写)"></a>doublewrite(两次写)</h1><p>doublewrite能够确保InnoDB存储引擎的数据页的可靠性。<br>如果InnnoDB存储引擎正在写入某个页到表中，可能只写了页中的一部分就发生了宕机等故障，造成部分写失效。需要对数据进行恢复。<br>可能首先想到实现数据恢复的做法是利用Redo log（重做日志）,但是重做日志记录的是对页的物理操作，但是如果这个页已经发生了损坏，再对其页页进行重做就没有意义了。这时就用到了<strong>doublewrite</strong>操作。<br>简单的说，在应用重做日志之前，用户需要一个页的副本，当写入失效发生时，先通过页的副本来还原该页，再进行重做。<br><img src="https://raw.githubusercontent.com/spurstong/img_data/master/%E6%95%B0%E6%8D%AE%E5%BA%93doublewrite/1.png" alt="doublewrite步骤"><br>doublewrite由两部分组成，一部分是内存中的doublewrite,大小为2MB;另一部分是物理磁盘上共享表空间中连续的128个页，即两个区，大小同样我2MB。在对缓冲池的脏页进行刷新时，并不直接写磁盘，而是会通过memcpy函数将脏页先复制到内存中的doublewrite buffer,之后通过double write再分两次，每次1MB顺序地写入共享表空间的物理磁盘上，然后马上调用fsync函数，同步磁盘，避免缓冲写带来的问题。<br>如果操作系统在将页写入磁盘的过程中发生了崩溃，在恢复过程中，InnoDB存储引擎可以从共享表空间中的doublewrite中找到该页的一个副本，将其复制到表空间文件中，再应用重做日志。</p>
+</div></article></div></main><footer><div class="paginator"><a href="/2019/12/04/rocketMq消息主从同步机制/" class="next">下一篇</a></div><div id="disqus_thread"></div><script>var disqus_shortname = 'seansun';
+var disqus_identifier = '2020/01/11/redo日志、undo日志、binlog日志与doulewrite操作/';
+var disqus_title = 'redo日志、undo日志、binlog日志与doublewrite分析';
+var disqus_url = 'https://github.com/spurstong/2020/01/11/redo日志、undo日志、binlog日志与doulewrite操作/';
+(function() {
+    var dsq = document.createElement('script'); dsq.type = 'text/javascript'; dsq.async = true;
+    dsq.src = '//' + disqus_shortname + '.disqus.com/embed.js';
+    (document.getElementsByTagName('head')[0] || document.getElementsByTagName('body')[0]).appendChild(dsq);
+})();</script><script id="dsq-count-scr" src="//seansun.disqus.com/count.js" async></script><div class="copyright"><p>© 2018 - 2020 <a href="https://github.com/spurstong">Mara Tong</a>, powered by <a href="https://hexo.io/" target="_blank">Hexo</a> and <a href="https://github.com/pinggod/hexo-theme-apollo" target="_blank">hexo-theme-apollo</a>.</p></div></footer></div><script async src="//cdn.bootcss.com/mathjax/2.7.0/MathJax.js?config=TeX-MML-AM_CHTML" integrity="sha384-crwIf/BuaWM9rM65iM+dWFldgQ1Un8jWZMuh3puxb8TOY9+linwLoI7ZHZT+aekW" crossorigin="anonymous"></script></body></html>
